@@ -67,6 +67,7 @@
       enable = true;
       type = "fcitx5";
       fcitx5.addons = with pkgs; [
+	fcitx5-rime
         fcitx5-mozc
         fcitx5-gtk
         fcitx5-chinese-addons
@@ -133,7 +134,8 @@
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = true;
-  services.openssh.settings.PermitRootLogin = "no";
+  services.openssh.settings.PermitRootLogin = "yes";
+  users.users.root.initialPassword = "root";
 
   # Enable flatpak. I don't use any flatpak apps but I do sometimes
   # test them so I keep this enabled.

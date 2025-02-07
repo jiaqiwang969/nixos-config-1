@@ -1,0 +1,143 @@
+diff --git a/Makefile b/Makefile
+index f039201..94fdc99 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,13 +1,14 @@
+ # Connectivity info for Linux VM
+-NIXADDR ?= unset
++NIXADDR ?= 172.16.148.132
+ NIXPORT ?= 22
+ NIXUSER ?= mitchellh
++NIXDEVICE ?= /dev/sda
+ 
+ # Get the path to this Makefile and directory
+ MAKEFILE_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
+ 
+ # The name of the nixosConfiguration in the flake
+-NIXNAME ?= vm-intel
++NIXNAME ?= vm-aarch64
+ 
+ # SSH options that are used. These aren't meant to be overridden but are
+ # reused a lot so we just store them up here.
+@@ -48,23 +49,23 @@ cache:
+ # NOTE(mitchellh): I'm sure there is a way to do this and bootstrap all
+ # in one step but when I tried to merge them I got errors. One day.
+ vm/bootstrap0:
+-	ssh $(SSH_OPTIONS) -p$(NIXPORT) root@$(NIXADDR) " \
+-		parted /dev/sda -- mklabel gpt; \
+-		parted /dev/sda -- mkpart primary 512MB -8GB; \
+-		parted /dev/sda -- mkpart primary linux-swap -8GB 100\%; \
+-		parted /dev/sda -- mkpart ESP fat32 1MB 512MB; \
+-		parted /dev/sda -- set 3 esp on; \
++	ssh $(SSH_OPTIONS) -p $(NIXPORT) root@$(NIXADDR) " \
++		parted $(NIXDEVICE) -- mklabel gpt; \
++		parted $(NIXDEVICE) -- mkpart primary 512MB -8GB; \
++		parted $(NIXDEVICE) -- mkpart primary linux-swap -8GB 100\%; \
++		parted $(NIXDEVICE) -- mkpart ESP fat32 1MB 512MB; \
++		parted $(NIXDEVICE) -- set 3 esp on; \
+ 		sleep 1; \
+-		mkfs.ext4 -L nixos /dev/sda1; \
+-		mkswap -L swap /dev/sda2; \
+-		mkfs.fat -F 32 -n boot /dev/sda3; \
++		mkfs.ext4 -L nixos $(NIXDEVICE)1; \
++		mkswap -L swap $(NIXDEVICE)2; \
++		mkfs.fat -F 32 -n boot $(NIXDEVICE)3; \
+ 		sleep 1; \
+ 		mount /dev/disk/by-label/nixos /mnt; \
+ 		mkdir -p /mnt/boot; \
+ 		mount /dev/disk/by-label/boot /mnt/boot; \
+ 		nixos-generate-config --root /mnt; \
+ 		sed --in-place '/system\.stateVersion = .*/a \
+-			nix.package = pkgs.nixUnstable;\n \
++			nix.package = pkgs.nixVersions.latest;\n \
+ 			nix.extraOptions = \"experimental-features = nix-command flakes\";\n \
+ 			nix.settings.substituters = [\"https://mitchellh-nixos-config.cachix.org\"];\n \
+ 			nix.settings.trusted-public-keys = [\"mitchellh-nixos-config.cachix.org-1:bjEbXJyLrL1HZZHBbO4QALnI5faYZppzkU4D2s0G8RQ=\"];\n \
+@@ -89,13 +90,13 @@ vm/bootstrap:
+ # copy our secrets into the VM
+ vm/secrets:
+ 	# GPG keyring
+-	rsync -av -e 'ssh $(SSH_OPTIONS)' \
++	rsync -av -e 'ssh $(SSH_OPTIONS) -p$(NIXPORT)' \
+ 		--exclude='.#*' \
+ 		--exclude='S.*' \
+ 		--exclude='*.conf' \
+ 		$(HOME)/.gnupg/ $(NIXUSER)@$(NIXADDR):~/.gnupg
+ 	# SSH keys
+-	rsync -av -e 'ssh $(SSH_OPTIONS)' \
++	rsync -av -e 'ssh $(SSH_OPTIONS) -p$(NIXPORT)' \
+ 		--exclude='environment' \
+ 		$(HOME)/.ssh/ $(NIXUSER)@$(NIXADDR):~/.ssh
+ 
+@@ -113,7 +114,7 @@ vm/copy:
+ # have to run vm/copy before.
+ vm/switch:
+ 	ssh $(SSH_OPTIONS) -p$(NIXPORT) $(NIXUSER)@$(NIXADDR) " \
+-		sudo NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1 nixos-rebuild switch --flake \"/nix-config#${NIXNAME}\" \
++		sudo NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1 nixos-rebuild switch --flake \"/nix-config#${NIXNAME}\" --accept-flake-config  \
+ 	"
+ 
+ # Build a WSL installer
+diff --git a/flake.nix b/flake.nix
+index 2a156cc..8a5cf69 100644
+--- a/flake.nix
++++ b/flake.nix
+@@ -1,6 +1,7 @@
+ {
+   description = "NixOS systems and tools by mitchellh";
+ 
++
+   inputs = {
+     # Pin our primary nixpkgs repository. This is the main nixpkgs repository
+     # we'll use for our configurations. Be very careful changing this because
+diff --git a/machines/vm-shared.nix b/machines/vm-shared.nix
+index 1a1c2b4..afb2f88 100644
+--- a/machines/vm-shared.nix
++++ b/machines/vm-shared.nix
+@@ -67,6 +67,7 @@
+       enable = true;
+       type = "fcitx5";
+       fcitx5.addons = with pkgs; [
++	fcitx5-rime
+         fcitx5-mozc
+         fcitx5-gtk
+         fcitx5-chinese-addons
+@@ -133,7 +134,8 @@
+   # Enable the OpenSSH daemon.
+   services.openssh.enable = true;
+   services.openssh.settings.PasswordAuthentication = true;
+-  services.openssh.settings.PermitRootLogin = "no";
++  services.openssh.settings.PermitRootLogin = "yes";
++  users.users.root.initialPassword = "root";
+ 
+   # Enable flatpak. I don't use any flatpak apps but I do sometimes
+   # test them so I keep this enabled.
+diff --git a/machines/wsl.nix b/machines/wsl.nix
+index f1812eb..cab8666 100644
+--- a/machines/wsl.nix
++++ b/machines/wsl.nix
+@@ -9,7 +9,7 @@
+   };
+ 
+   nix = {
+-    package = pkgs.nixUnstable;
++    package = pkgs.nixVersions.latest;
+     extraOptions = ''
+       experimental-features = nix-command flakes
+       keep-outputs = true
+diff --git a/users/mitchellh/nixos.nix b/users/mitchellh/nixos.nix
+index ddd3fd7..a8c032f 100644
+--- a/users/mitchellh/nixos.nix
++++ b/users/mitchellh/nixos.nix
+@@ -15,9 +15,9 @@
+     home = "/home/mitchellh";
+     extraGroups = [ "docker" "lxd" "wheel" ];
+     shell = pkgs.fish;
+-    hashedPassword = "$6$p5nPhz3G6k$6yCK0m3Oglcj4ZkUXwbjrG403LBZkfNwlhgrQAqOospGJXJZ27dI84CbIYBNsTgsoH650C1EBsbCKesSVPSpB1";
++    hashedPassword = "$6$8WqHXBEi1JIIAhUh$HmYTH8DLPG.NVxo.Cmj1yDb/55ASwVehYWUpSY8gZEk33q1nx5FkdaXoX5s/yw50GaEPehWnQuQE3PJ13b3he/";
+     openssh.authorizedKeys.keys = [
+-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGbTIKIPtrymhvtTvqbU07/e7gyFJqNS4S0xlfrZLOaY mitchellh"
++      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN+VXTehNqZod7c/B+dW8Ky2B946nG0ud9zyzEue7LUr jqwang"
+     ];
+   };
+ 

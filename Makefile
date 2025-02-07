@@ -1,13 +1,14 @@
 # Connectivity info for Linux VM
-NIXADDR ?= unset
+NIXADDR ?= 172.16.148.132
 NIXPORT ?= 22
 NIXUSER ?= mitchellh
+NIXDEVICE ?= /dev/sda
 
 # Get the path to this Makefile and directory
 MAKEFILE_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
 # The name of the nixosConfiguration in the flake
-NIXNAME ?= vm-intel
+NIXNAME ?= vm-aarch64
 
 # SSH options that are used. These aren't meant to be overridden but are
 # reused a lot so we just store them up here.
@@ -48,23 +49,23 @@ cache:
 # NOTE(mitchellh): I'm sure there is a way to do this and bootstrap all
 # in one step but when I tried to merge them I got errors. One day.
 vm/bootstrap0:
-	ssh $(SSH_OPTIONS) -p$(NIXPORT) root@$(NIXADDR) " \
-		parted /dev/sda -- mklabel gpt; \
-		parted /dev/sda -- mkpart primary 512MB -8GB; \
-		parted /dev/sda -- mkpart primary linux-swap -8GB 100\%; \
-		parted /dev/sda -- mkpart ESP fat32 1MB 512MB; \
-		parted /dev/sda -- set 3 esp on; \
+	ssh $(SSH_OPTIONS) -p $(NIXPORT) root@$(NIXADDR) " \
+		parted $(NIXDEVICE) -- mklabel gpt; \
+		parted $(NIXDEVICE) -- mkpart primary 512MB -8GB; \
+		parted $(NIXDEVICE) -- mkpart primary linux-swap -8GB 100\%; \
+		parted $(NIXDEVICE) -- mkpart ESP fat32 1MB 512MB; \
+		parted $(NIXDEVICE) -- set 3 esp on; \
 		sleep 1; \
-		mkfs.ext4 -L nixos /dev/sda1; \
-		mkswap -L swap /dev/sda2; \
-		mkfs.fat -F 32 -n boot /dev/sda3; \
+		mkfs.ext4 -L nixos $(NIXDEVICE)1; \
+		mkswap -L swap $(NIXDEVICE)2; \
+		mkfs.fat -F 32 -n boot $(NIXDEVICE)3; \
 		sleep 1; \
 		mount /dev/disk/by-label/nixos /mnt; \
 		mkdir -p /mnt/boot; \
 		mount /dev/disk/by-label/boot /mnt/boot; \
 		nixos-generate-config --root /mnt; \
 		sed --in-place '/system\.stateVersion = .*/a \
-			nix.package = pkgs.nixUnstable;\n \
+			nix.package = pkgs.nixVersions.latest;\n \
 			nix.extraOptions = \"experimental-features = nix-command flakes\";\n \
 			nix.settings.substituters = [\"https://mitchellh-nixos-config.cachix.org\"];\n \
 			nix.settings.trusted-public-keys = [\"mitchellh-nixos-config.cachix.org-1:bjEbXJyLrL1HZZHBbO4QALnI5faYZppzkU4D2s0G8RQ=\"];\n \
@@ -89,13 +90,13 @@ vm/bootstrap:
 # copy our secrets into the VM
 vm/secrets:
 	# GPG keyring
-	rsync -av -e 'ssh $(SSH_OPTIONS)' \
+	rsync -av -e 'ssh $(SSH_OPTIONS) -p$(NIXPORT)' \
 		--exclude='.#*' \
 		--exclude='S.*' \
 		--exclude='*.conf' \
 		$(HOME)/.gnupg/ $(NIXUSER)@$(NIXADDR):~/.gnupg
 	# SSH keys
-	rsync -av -e 'ssh $(SSH_OPTIONS)' \
+	rsync -av -e 'ssh $(SSH_OPTIONS) -p$(NIXPORT)' \
 		--exclude='environment' \
 		$(HOME)/.ssh/ $(NIXUSER)@$(NIXADDR):~/.ssh
 
@@ -113,7 +114,7 @@ vm/copy:
 # have to run vm/copy before.
 vm/switch:
 	ssh $(SSH_OPTIONS) -p$(NIXPORT) $(NIXUSER)@$(NIXADDR) " \
-		sudo NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1 nixos-rebuild switch --flake \"/nix-config#${NIXNAME}\" \
+		sudo NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1 nixos-rebuild switch --flake \"/nix-config#${NIXNAME}\" --accept-flake-config  \
 	"
 
 # Build a WSL installer
