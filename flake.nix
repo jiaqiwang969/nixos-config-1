@@ -66,7 +66,7 @@
     nvim-web-devicons.flake = false;
     vim-copilot.url = "github:github/copilot.vim/v1.41.0";
     vim-copilot.flake = false;
-    vim-misc.url = "github:mitchellh/vim-misc";
+    vim-misc.url = "github:jiaqiwang969/vim-misc";
     vim-misc.flake = false;
   };
 
@@ -93,33 +93,33 @@
   in {
     nixosConfigurations.vm-aarch64 = mkSystem "vm-aarch64" {
       system = "aarch64-linux";
-      user   = "mitchellh";
+      user   = "jqwang";
     };
 
     nixosConfigurations.vm-aarch64-prl = mkSystem "vm-aarch64-prl" rec {
       system = "aarch64-linux";
-      user   = "mitchellh";
+      user   = "jqwang";
     };
 
     nixosConfigurations.vm-aarch64-utm = mkSystem "vm-aarch64-utm" rec {
       system = "aarch64-linux";
-      user   = "mitchellh";
+      user   = "jqwang";
     };
 
     nixosConfigurations.vm-intel = mkSystem "vm-intel" rec {
       system = "x86_64-linux";
-      user   = "mitchellh";
+      user   = "jqwang";
     };
 
     nixosConfigurations.wsl = mkSystem "wsl" {
       system = "x86_64-linux";
-      user   = "mitchellh";
+      user   = "jqwang";
       wsl    = true;
     };
 
     darwinConfigurations.macbook-pro-m1 = mkSystem "macbook-pro-m1" {
       system = "aarch64-darwin";
-      user   = "mitchellh";
+      user   = "jqwang";
       darwin = true;
     };
   };

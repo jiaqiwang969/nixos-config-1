@@ -1,7 +1,7 @@
 # Connectivity info for Linux VM
-NIXADDR ?= 172.16.148.132
+NIXADDR ?= 172.16.148.135
 NIXPORT ?= 22
-NIXUSER ?= mitchellh
+NIXUSER ?= jqwang
 NIXDEVICE ?= /dev/sda
 
 # Get the path to this Makefile and directory
@@ -39,7 +39,7 @@ endif
 cache:
 	nix build '.#nixosConfigurations.$(NIXNAME).config.system.build.toplevel' --json \
 		| jq -r '.[].outputs | to_entries[].value' \
-		| cachix push mitchellh-nixos-config
+		| cachix push jiaqiwang969
 
 # bootstrap a brand new VM. The VM should have NixOS ISO on the CD drive
 # and just set the password of the root user to "root". This will install
@@ -67,8 +67,8 @@ vm/bootstrap0:
 		sed --in-place '/system\.stateVersion = .*/a \
 			nix.package = pkgs.nixVersions.latest;\n \
 			nix.extraOptions = \"experimental-features = nix-command flakes\";\n \
-			nix.settings.substituters = [\"https://mitchellh-nixos-config.cachix.org\"];\n \
-			nix.settings.trusted-public-keys = [\"mitchellh-nixos-config.cachix.org-1:bjEbXJyLrL1HZZHBbO4QALnI5faYZppzkU4D2s0G8RQ=\"];\n \
+			nix.settings.substituters = [\"https://jiaqiwang969.cachix.org\"];\n \
+			nix.settings.trusted-public-keys = [\"jiaqiwang969.cachix.org-1:FXY5IvEszf/K/0ZhwnrG+cy+nsPc/nVHYSM8WnQaMvE=\"];\n \
   			services.openssh.enable = true;\n \
 			services.openssh.settings.PasswordAuthentication = true;\n \
 			services.openssh.settings.PermitRootLogin = \"yes\";\n \
