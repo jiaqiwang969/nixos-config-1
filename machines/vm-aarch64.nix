@@ -13,7 +13,20 @@
   disabledModules = [ "virtualisation/vmware-guest.nix" ];
 
   # Interface is this on M1
-  networking.interfaces.ens160.useDHCP = true;
+  networking = {
+    interfaces.ens160.useDHCP = true;
+    networkmanager.enable = true;
+  };
+
+  # 添加 systemd 网络等待配置
+  systemd.network = {
+    wait-online = {
+      enable = false;  # 完全禁用等待服务
+      timeout = 10;    # 如果启用，设置 10 秒超时
+      anyInterface = true;  # 任何接口连接即可
+      # ignoredInterfaces = [ "ens160" ];  # 可选：忽略特定接口
+    };
+  };
 
   # Lots of stuff that uses aarch64 that claims doesn't work, but actually works.
   nixpkgs.config.allowUnfree = true;

@@ -80,6 +80,15 @@
         # gh CLI on stable has bugs.
         gh = inputs.nixpkgs-unstable.legacyPackages.${prev.system}.gh;
 
+        # code-cursor from unstable
+        code-cursor = (import inputs.nixpkgs-unstable {
+          inherit (prev) system;
+          config = {
+            allowUnfree = true;
+            allowAliases = true;
+          };
+        }).code-cursor;
+
         ibus = ibus_stable;
         ibus_stable = inputs.nixpkgs.legacyPackages.${prev.system}.ibus;
         ibus_1_5_29 = inputs.nixpkgs-old-ibus.legacyPackages.${prev.system}.ibus;

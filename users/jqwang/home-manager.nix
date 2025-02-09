@@ -7,6 +7,7 @@ let
   isDarwin = pkgs.stdenv.isDarwin;
   isLinux = pkgs.stdenv.isLinux;
 
+
   # For our MANPAGER env var
   # https://github.com/sharkdp/bat/issues/1145
   manpager = (pkgs.writeShellScriptBin "manpager" (if isDarwin then ''
@@ -20,6 +21,32 @@ in {
   home.stateVersion = "18.09";
 
   xdg.enable = true;
+
+
+  #--------------------------------------------------------------
+  # User gnome setting
+  #-------------------------------------------------------------
+  dconf.settings = {
+    # ...
+    "org/gnome/desktop/interface" = {
+	color-scheme = "prefer-dark";
+     };
+
+    "org/gnome/control-center" = {
+	last-panel = "background";
+    };
+
+    "org/gnome/desktop/session" = {
+	    idle-delay = 0;
+    };
+
+  };
+
+
+
+
+
+
 
   #---------------------------------------------------------------------
   # Packages
@@ -48,6 +75,8 @@ in {
 
     # Node is required for Copilot.vim
     pkgs.nodejs
+    pkgs.ghostty
+    pkgs.code-cursor
   ] ++ (lib.optionals isDarwin [
     # This is automatically setup on Linux
     pkgs.cachix
@@ -134,6 +163,7 @@ in {
         prefix= [
           "$HOME/code/go/src/github.com/hashicorp"
           "$HOME/code/go/src/github.com/mitchellh"
+          "$HOME/code/go/src/github.com/jiaqiwang969"
         ];
 
         exact = ["$HOME/.envrc"];
@@ -184,10 +214,10 @@ in {
 
   programs.git = {
     enable = true;
-    userName = "Mitchell Hashimoto";
-    userEmail = "m@mitchellh.com";
+    userName = "jiaqiwang969";
+    userEmail = "jiaqiwang969@gmail.com";
     signing = {
-      key = "523D5DC389D273BC";
+      key = "398692536D652C07";
       signByDefault = true;
     };
     aliases = {
@@ -344,4 +374,5 @@ in {
     size = 128;
     x11.enable = true;
   };
+
 }
