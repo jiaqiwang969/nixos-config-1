@@ -3,6 +3,10 @@
     ./hardware/vm-aarch64.nix
     ../modules/vmware-guest.nix
     ./vm-shared.nix
+    (import (fetchTarball {
+        url = "https://github.com/nix-community/nixos-vscode-server/tarball/master";
+        sha256 = "09j4kvsxw1d5dvnhbsgih0icbrxqv90nzf0b589rb5z6gnzwjnqf"; # ✅ 正确
+    }))
   ];
 
   # Setup qemu so we can run x86_64 binaries
@@ -28,6 +32,8 @@
     };
   };
 
+  systemd.services."NetworkManager-wait-online".enable = false;
+
   # Lots of stuff that uses aarch64 that claims doesn't work, but actually works.
   nixpkgs.config.allowUnfree = true;
   nixpkgs.config.allowUnsupportedSystem = true;
@@ -48,4 +54,8 @@
       "defaults"
     ];
   };
+
+  services.vscode-server.enable = true;
+  services.vscode-server.enableFHS = true;
+  services.vscode-server.installPath = "$HOME/.cursor-server";  # 👈 关键是这行
 }

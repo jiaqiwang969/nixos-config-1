@@ -1,5 +1,5 @@
 # Connectivity info for Linux VM
-NIXADDR ?= 172.16.148.135
+NIXADDR ?= 172.16.148.137
 NIXPORT ?= 22
 NIXUSER ?= jqwang
 NIXDEVICE ?= /dev/sda
@@ -116,7 +116,7 @@ vm/switch:
 	ssh $(SSH_OPTIONS) -p$(NIXPORT) $(NIXUSER)@$(NIXADDR) " \
 		sudo NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1 nixos-rebuild switch --flake \"/nix-config#${NIXNAME}\" --accept-flake-config  \
 	"
-
+#sudo -E env NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1 nixos-rebuild switch --flake .#vm-aarch64 --impure
 # Build a WSL installer
 .PHONY: wsl
 wsl:

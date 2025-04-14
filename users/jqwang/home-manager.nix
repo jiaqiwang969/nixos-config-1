@@ -76,7 +76,7 @@ in {
     # Node is required for Copilot.vim
     pkgs.nodejs
     pkgs.ghostty
-    pkgs.code-cursor
+    #pkgs.code-cursor
   ] ++ (lib.optionals isDarwin [
     # This is automatically setup on Linux
     pkgs.cachix
