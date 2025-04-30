@@ -1,0 +1,27 @@
+\contentsline {section}{\numberline {1}概述与核心理念}{3}{section.1}%
+\contentsline {subsection}{\numberline {1.1}架构目标}{3}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}核心技术栈与输入依赖 (`inputs`)}{3}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}`flake.nix` 的中心协调作用与输出 (`outputs`)}{3}{subsection.1.3}%
+\contentsline {section}{\numberline {2}系统配置管理功能}{4}{section.2}%
+\contentsline {subsection}{\numberline {2.1}跨平台支持}{4}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}基础系统构建}{4}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}主机特化与硬件适配}{4}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4}可选系统功能模块化}{4}{subsection.2.4}%
+\contentsline {section}{\numberline {3}用户环境管理功能 (Home Manager)}{4}{section.3}%
+\contentsline {subsection}{\numberline {3.1}多用户环境支持}{4}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}通用用户配置共享}{4}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}精细化配置组合}{4}{subsection.3.3}%
+\contentsline {section}{\numberline {4}高级功能集成}{5}{section.4}%
+\contentsline {subsection}{\numberline {4.1}磁盘布局管理}{5}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}密钥管理}{5}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}自定义软件包与修改}{5}{subsection.4.3}%
+\contentsline {section}{\numberline {5}开发与部署支持功能}{5}{section.5}%
+\contentsline {subsection}{\numberline {5.1}一致的开发环境}{5}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}代码质量保障}{5}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}自动化安装与部署}{5}{subsection.5.3}%
+\contentsline {section}{\numberline {6}架构设计与软件工程实践}{5}{section.6}%
+\contentsline {subsection}{\numberline {6.1}模块化与抽象 (`modules`, `lib`, `common/*`)}{5}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}关注点分离}{6}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}显式依赖与可复现性}{6}{subsection.6.3}%
+\contentsline {subsection}{\numberline {6.4}可视化辅助理解 (图例 Legend 解读)}{6}{subsection.6.4}%
+\contentsline {section}{\numberline {7}结论}{6}{section.7}%

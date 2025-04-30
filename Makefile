@@ -1,5 +1,5 @@
 # Connectivity info for Linux VM
-NIXADDR ?= 172.16.148.137
+NIXADDR ?= 172.16.148.144
 NIXPORT ?= 22
 NIXUSER ?= jqwang
 NIXDEVICE ?= /dev/sda

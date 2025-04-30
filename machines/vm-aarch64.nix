@@ -41,18 +41,20 @@
   # This works through our custom module imported above
   virtualisation.vmware.guest.enable = true;
 
-  # Share our host filesystem
+
   fileSystems."/host" = {
-    fsType = "fuse./run/current-system/sw/bin/vmhgfs-fuse";
-    device = ".host:/";
-    options = [
-      "umask=22"
-      "uid=1000"
-      "gid=1000"
-      "allow_other"
-      "auto_unmount"
-      "defaults"
-    ];
+      fsType = "fuse.vmhgfs-fuse";
+      device = ".host:/";
+      options = [
+          "uid=1000"
+          "gid=1000"
+          "allow_other"
+          "auto_unmount"
+          "defaults"
+          "nofail"
+          "x-systemd.automount"
+          "x-systemd.device-timeout=5s"
+      ];
   };
 
   services.vscode-server.enable = true;

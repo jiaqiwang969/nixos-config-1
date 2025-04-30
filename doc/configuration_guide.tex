@@ -1,0 +1,344 @@
+\documentclass[11pt, a4paper]{article} % 参考 test.tex 使用 11pt
+
+% --- 包配置 (合并自两个文件) ---
+\usepackage[UTF8]{ctex}       % 中文支持
+\usepackage{geometry}       % 页面边距
+\usepackage{amsmath}        % 数学公式 (可能需要)
+\usepackage{graphicx}       % 插入图片 (如果需要)
+\usepackage{hyperref}       % 超链接
+\usepackage{listings}       % 代码块
+\usepackage{xcolor}         % 颜色
+\usepackage{titling}        % 自定义标题
+\usepackage{enumitem}       % 自定义列表
+
+% --- 文档信息 ---
+\title{Nix 配置架构与使用指南}
+\author{AI Assistant (融合分析与实践)}
+\date{\today}
+
+% --- Hyperref 设置 ---
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+    pdftitle={Nix 配置架构与使用指南},
+    pdfpagemode=FullScreen,
+}
+
+% --- Listings 设置 (代码块样式) ---
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{green!60!black},
+  stringstyle=\color{purple},
+  breakatwhitespace=false,
+  tabsize=2,
+  captionpos=b,
+  escapeinside={(*@}{@*)},
+  literate={\&}{{{\&}}}1,
+  morekeywords={nix, let, in, import, config, lib, pkgs, inputs, outputs, nixosSystem, darwinSystem, mkSystem, home, environment, programs, services, users, true, false, self, super, inherit}
+}
+
+% --- 开始文档 ---
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+本文档旨在提供对当前 Nix 配置仓库的全面分析与实用指导。它首先阐述了配置的核心理念、架构目标和所依赖的关键技术（Nix Flakes）。接着，详细解析了代码库的模块化结构和设计原则。在此基础上，文档分步指导了如何在不同平台（NixOS VM, macOS, WSL）上进行首次环境部署。随后，介绍了用户环境管理（Home Manager）的实践方法和常见定制任务（如包管理、环境修改、Overlays 使用）。最后，汇总了日常维护的工作流程和命令。本文的目标是结合架构理解与动手实践，帮助用户高效地使用、维护和扩展这套配置。
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% --- 正文内容 ---
+
+\section{概述与核心理念}
+
+\subsection{架构目标}
+本 Nix 配置仓库旨在实现一套声明式、可复现、高度模块化的配置管理方案，其核心目标包括：
+    \begin{itemize}
+        \item \textbf{声明式与可复现}: 通过 Nix 的纯函数特性，确保任何时候的构建结果都是一致的，便于版本控制、回滚和跨设备部署。
+        \item \textbf{模块化与可扩展}: 将复杂的系统和用户配置分解为可重用的、逻辑独立的模块，降低维护成本，提高扩展性。
+        \item \textbf{跨平台一致性}: 利用统一的 Flake 接口管理 NixOS、macOS (nix-darwin) 和 WSL 环境，尽可能共享配置逻辑。
+        \item \textbf{简化工作流}: 通过 \texttt{Makefile} 封装常用 Nix 命令，提供便捷的操作入口，降低日常使用门槛。
+    \end{itemize}
+
+\subsection{核心技术栈：Nix Flakes}
+Nix Flakes 是本配置的基石，提供了现代化的 Nix 包管理和项目结构规范：
+    \begin{itemize}
+        \item \textbf{显式依赖管理 (`inputs`)}: 在 \texttt{flake.nix} 中明确声明所有外部依赖（如 \texttt{nixpkgs}, \texttt{home-manager}, \texttt{nix-darwin} 等），并通过 \texttt{flake.lock} 文件锁定其精确版本，保证了构建的确定性。
+        \item \textbf{标准化的输出 (`outputs`)}: \texttt{flake.nix} 定义了一组标准的输出类型，如 \texttt{nixosConfigurations},\allowbreak \texttt{darwinConfigurations},\allowbreak \texttt{homeConfigurations},\allowbreak \texttt{overlays},\allowbreak \texttt{pkgs},\allowbreak \texttt{devShells} 等，使得配置的结构清晰，易于被其他 Flake 或工具消费。
+    \end{itemize}
+
+\subsection{\texttt{flake.nix} 的中心协调作用与 \texttt{Makefile}}
+    \begin{itemize}
+        \item \texttt{flake.nix}: 作为配置仓库的\textbf{唯一入口点}，它 orchestrates 了所有内部模块和外部依赖，定义了最终可构建的系统和用户配置蓝图。它通常会调用内部库函数（如下文的 \texttt{lib/mksystem.nix}）来组装最终的配置。
+        \item \texttt{Makefile}: 提供了一层用户友好的抽象，封装了常见的 Nix Flake 命令。用户可以通过简单的 \texttt{make} 命令执行诸如系统切换 (\texttt{make switch})、虚拟机引导 (\texttt{make vm/bootstrap})、测试构建 (\texttt{make test}) 等操作，而无需记忆复杂的 \texttt{nix build} 或 \texttt{nixos-rebuild} 参数。
+    \end{itemize}
+
+\section{架构设计与配置结构}
+本配置采用模块化的设计思想，将不同关注点的配置分离到独立的目录和文件中，以提高可维护性和复用性。
+
+\subsection{模块化与抽象 (\texttt{lib}, \texttt{modules})}
+    \begin{itemize}
+        \item \texttt{lib/}: 存放可重用的 Nix 函数和逻辑。例如，\texttt{lib/mksystem.nix} 可能是一个核心辅助函数，负责接收参数（如主机名、用户名、系统类型），并根据这些参数加载、组合正确的机器配置、用户配置、模块和 Overlays，最终生成一个完整的系统配置对象。这体现了配置构建逻辑的抽象。
+        \item \texttt{modules/}: 存放跨机器、跨用户共享的 NixOS 或 Darwin 配置模块。这些模块封装了特定的功能（如通用开发环境设置、特定服务配置），可以在机器或用户配置中按需导入，遵循 DRY (Don't Repeat Yourself) 原则。
+    \end{itemize}
+
+\subsection{关注点分离 (目录结构)}
+配置库的目录结构清晰地反映了关注点的分离：
+    \begin{itemize}[leftmargin=*]
+        \item \texttt{flake.nix}: 顶层入口和依赖定义。
+        \item \texttt{machines/}: \textbf{机器特定配置}。存放与特定硬件或虚拟机环境相关的系统级设置。每台主机（物理机或 VM）对应一个文件，例如 \texttt{machines/vm-aarch64.nix} 可能包含 VMware 驱动或特定内核参数，而 \texttt{machines/macbook-pro-m1.nix} 可能包含 Darwin 特有的设置。这些文件通常会导入 \texttt{modules/} 中的通用模块。
+        \item \texttt{users/}: \textbf{用户配置}。每个用户一个子目录。
+            \begin{itemize}
+                \item \texttt{<user>/(nixos|darwin).nix}: 定义用户的系统级属性，如 UID, GID, 所属组，以及可能需要的系统级服务或全局包（虽然包管理更推荐在 Home Manager 中进行）。
+                \item \texttt{<user>/home-manager.nix}: \textbf{核心用户环境配置}。利用 Home Manager 声明式地管理用户的 dotfiles (如 \texttt{.zshrc}, \texttt{.gitconfig}), 用户级服务, 用户安装的软件包 (\texttt{home.packages}), 环境变量, GUI 应用设置等。这是个性化用户环境的主要场所。
+            \end{itemize}
+        \item \texttt{overlays/}: \textbf{Nixpkgs 覆盖与扩展}。存放用于修改 \texttt{nixpkgs} 中现有包（如打补丁、修改编译选项）或添加自定义包定义的 Overlay 文件。这些 Overlays 通常由 \texttt{lib/mksystem.nix} 应用到最终的 \texttt{pkgs} 集合中。
+        \item \texttt{pkgs/}: \textbf{自定义 Nix 包}。存放不适合放在 Overlay 中或更复杂的自定义软件包的 Nix derivation 定义。
+        \item \texttt{doc/}: \textbf{文档}。包含本指南的 LaTeX 源码及相关资源。
+    \end{itemize}
+
+\subsection{显式依赖与可复现性}
+Flakes 机制保证了所有外部依赖的版本都被精确记录在 \texttt{flake.lock} 文件中。结合 Nix 的纯函数构建模式，确保了无论何时何地，只要使用相同的 Git commit 和 lock 文件，就能构建出完全相同的系统环境，实现了高度的可复现性。
+
+\section{系统配置管理与部署}
+本节介绍如何利用此配置管理不同平台的系统，并指导完成首次环境设置。
+
+\subsection{跨平台支持}
+\texttt{flake.nix} 的 \texttt{outputs} 通过调用 \texttt{lib/mksystem.nix}（或其他类似机制）生成针对不同平台的配置：
+    \begin{itemize}
+        \item \texttt{nixosConfigurations}: 输出 NixOS 系统配置，适用于物理机、虚拟机或 WSL。
+        \item \texttt{darwinConfigurations}: 输出 nix-darwin 配置，适用于 macOS 系统。
+    \end{itemize}
+这种结构使得可以为不同平台（如 \texttt{x86\_64-linux}, \texttt{aarch64\_linux}, \texttt{aarch64\_darwin}）定义和构建系统。
+
+\subsection{主机特化 (\texttt{machines/})}
+如架构部分所述，\texttt{machines/} 目录用于存放特定主机的配置，允许根据硬件或运行环境进行定制，同时复用 \texttt{modules/} 中的通用逻辑。
+
+\subsection{首次环境部署实践}
+以下是在不同目标平台上部署此 Nix 配置的详细步骤。
+
+\subsubsection{部署到 NixOS 虚拟机 (以 VMware Fusion 为例)}
+这是创建标准化开发环境的常用方法。
+\begin{enumerate}[label=\textbf{\arabic*.}, wide, labelwidth=!, labelindent=0pt]
+    \item \textbf{准备 ISO}: 从 NixOS 官网下载对应架构 (x86\_64 或 aarch64) 的最小化 ISO 镜像。
+    \item \textbf{创建 VM (VMware)}:
+        \begin{itemize}
+            \item 使用 ISO 创建新虚拟机。
+            \item \textbf{关键设置}: 磁盘接口 SATA (确保证认设备为 \texttt{/dev/sda}，否则需调整 \texttt{Makefile} 的 \texttt{NIXDEVICE}), 分配足够资源 (CPU, RAM, 建议 >= 150GB 磁盘空间), 启用 3D 加速 (如果需要 GUI), 网络模式选择"与 Mac 共享"或桥接模式, 移除不必要的虚拟设备 (声卡等), 启动模式设为 UEFI。
+            \item \textbf{VMware 提示}: 在 VMware 设置中禁用 Mac 主机快捷键，避免与 VM 内快捷键冲突。
+        \end{itemize}
+    \item \textbf{启动 VM 并设置 root 密码}: 从 ISO 启动进入 NixOS 安装环境，打开终端：
+        \begin{lstlisting}
+sudo su
+passwd
+# 输入一个临时的 root 密码，例如 "root" (此密码仅用于 bootstrap 阶段)
+        \end{lstlisting}
+    \item \textbf{(可选) 创建快照}: 在 VMware 中为"干净"的安装环境创建一个快照 (如 "prebootstrap0")，方便出错时恢复。
+    \item \textbf{获取 VM IP 地址}: 在 VM 的终端运行 \texttt{ip addr} (或 \texttt{ifconfig})，记下其 IP 地址 (通常是 \texttt{192.168.x.y} 或 \texttt{172.16.x.y} 等本地地址)。
+    \item \textbf{配置 Makefile (在你的主机上)}:
+        \begin{itemize}
+            \item 克隆本 Nix 配置仓库到你的主机 (Mac 或 Linux)。
+            \item 编辑仓库根目录下的 \texttt{Makefile}，找到并修改 \texttt{NIXADDR} 变量，使其指向你刚刚获取的 VM IP 地址。
+            \item \textbf{指定目标主机名}: 根据你的 VM 架构和用途，在主机终端设置环境变量 \texttt{NIXNAME}，使其指向 \texttt{flake.nix} 中定义的目标 \texttt{nixosConfiguration} 名称。例如，对于 ARM 架构 VM，可能运行 \texttt{export NIXNAME=vm-aarch64}。对于 Intel VM，可能是 \texttt{export NIXNAME=vm-intel} (默认)。请查阅 \texttt{flake.nix} 确认可用的主机名。
+        \end{itemize}
+    \item \textbf{执行第一阶段引导 (主机 -> VM)}: 在主机终端，切换到 Nix 配置仓库的根目录，运行：
+        \begin{lstlisting}
+make vm/bootstrap0
+        \end{lstlisting}
+        此命令通过 SSH 连接到 VM (使用 root 用户和刚才设置的密码)，自动执行磁盘分区、格式化 (可能使用 disko)、生成基础 NixOS 配置 (包含 SSH 服务和 Flake 支持)，然后安装 NixOS 到硬盘。完成后 VM 会自动重启。
+    \item \textbf{执行第二阶段引导 (主机 -> VM)}: 等待 VM 从硬盘成功启动 (你可以尝试 \texttt{ssh root@<NIXADDR>} 来确认 SSH 服务是否可用)，然后在主机终端再次运行：
+        \begin{lstlisting}
+make vm/bootstrap
+        \end{lstlisting}
+        此命令会执行以下操作：
+        \begin{itemize}
+            \item 将你的完整 Nix 配置（整个仓库）通过 SSH (scp) 复制到 VM 的指定位置（例如 \texttt{/nix-config}）。
+            \item 在 VM 上以 root 身份执行 \texttt{nixos-rebuild switch --flake /nix-config\#\$NIXNAME}，应用你在 \texttt{NIXNAME} 中指定的全套配置。
+            \item (可选，取决于配置) 可能包含同步主机 SSH/GPG 密钥到 VM 中你定义的用户家目录的逻辑。
+            \item 再次重启 VM 以确保所有服务和设置生效。
+        \end{itemize}
+\end{enumerate}
+部署完成！现在你可以使用你在用户配置中定义的用户名和密码登录这个完全由 Nix 管理的 VM 了。
+
+\subsubsection{部署到 macOS (使用 nix-darwin)}
+\begin{enumerate}[label=\textbf{\arabic*.}, wide, labelwidth=!, labelindent=0pt]
+    \item \textbf{安装 Nix}: 确保你的 Mac 上已安装 Nix，并且启用了 Flakes 功能。推荐使用官方安装脚本或 Determinate Systems 的 Nix Installer。
+    \item \textbf{克隆仓库}: 将本 Nix 配置仓库克隆到你的 Mac 本地，例如 \texttt{\string~/code/nix-config}。
+    \item \textbf{选择配置名称}: 确认 \texttt{flake.nix} 的 \texttt{outputs.darwinConfigurations} 中为你这台 Mac 定义的配置名称，例如 \texttt{macbook-pro-m1}。
+    \item \textbf{应用配置}: 在你的 Mac 终端中，切换到 Nix 配置仓库的根目录，然后运行：
+        \begin{lstlisting}
+# 如果你的 Mac 配置名称不是默认值，先设置环境变量
+# export NIXNAME=macbook-pro-m1
+make switch
+        \end{lstlisting}
+        \texttt{Makefile} 检测到 Darwin 环境后，会自动调用 \texttt{darwin-rebuild switch --flake .\#\$NIXNAME}。首次执行会下载和构建大量依赖，耗时较长。
+\end{enumerate}
+\textbf{重要提示}: 在首次应用配置前，请务必仔细阅读 \texttt{flake.nix} 以及与你的 \texttt{NIXNAME} 相关的 \texttt{machines/<name>.nix}, \texttt{users/<user>/darwin.nix}, 和 \texttt{users/<user>/home-manager.nix} 文件，确保其中的设置符合你的预期，避免覆盖重要系统配置或个人数据。
+
+\subsubsection{构建并部署到 WSL}
+\begin{enumerate}[label=\textbf{\arabic*.}, wide, labelwidth=!, labelindent=0pt]
+    \item \textbf{构建 WSL Tarball (在 Linux/macOS 构建环境)}: 首先确保 \texttt{flake.nix} 的 \texttt{outputs.nixosConfigurations} 中定义了一个专门为 WSL 设计的配置 (例如，名为 \texttt{wsl})。然后，在你的 Nix 构建环境（可以是已配置好的 NixOS VM 或 Mac）中，切换到仓库根目录，运行：
+        \begin{lstlisting}
+make wsl
+# 或者直接 nix build .#nixosConfigurations.wsl.config.system.build.tarball
+        \end{lstlisting}
+        这会构建出 WSL 发行版所需的 rootfs tarball，通常位于 \texttt{./result/tarball/nixos-wsl.tar.gz} (具体路径取决于 \texttt{make wsl} 的实现)。
+    \item \textbf{导入到 Windows WSL}: 将生成的 \texttt{.tar.gz} 文件复制到你的 Windows 机器上。打开 PowerShell 或 CMD，执行以下命令：
+        \begin{lstlisting}
+# 1. 为你的 NixOS 发行版创建一个安装目录
+md C:\textbackslash wsl\textbackslash nixos
+
+# 2. 导入 tarball (替换路径为实际路径)
+wsl --import nixos C:\textbackslash wsl\textbackslash nixos C:\textbackslash path\textbackslash to\textbackslash your\textbackslash nixos-wsl.tar.gz --version 2
+
+# 3. 启动导入的 NixOS 发行版
+wsl -d nixos
+
+# 4. (可选) 将 NixOS 设置为默认 WSL 发行版
+wsl --set-default nixos
+        \end{lstlisting}
+\end{enumerate}
+之后，你就可以通过 Windows Terminal 或运行 \texttt{wsl -d nixos} 来进入你的 NixOS WSL 环境了。
+
+\section{用户环境管理 (Home Manager)}
+Home Manager 是管理用户级别配置的核心工具，允许你声明式地定义 dotfiles、软件包、服务和环境变量等。
+
+\subsection{用户配置结构 (\texttt{users/})}
+如架构部分所述，\texttt{users/} 目录下的每个子目录代表一个用户。其中的 \texttt{home-manager.nix} 文件是该用户环境配置的主要入口点。
+
+\subsection{常见任务：管理软件包}
+管理用户独立安装的软件包是 Home Manager 的常用功能。
+\begin{itemize}[leftmargin=*]
+    \item \textbf{为当前用户添加包}: 编辑你自己的 \texttt{users/<你的用户名>/home-manager.nix} 文件，找到或添加 \texttt{home.packages = [ ... ];} 列表，然后在列表中加入你想安装的包名，使用 \texttt{pkgs.<packageName>} 的形式，例如 \texttt{pkgs.htop}, \texttt{pkgs.ripgrep}。
+    \item \textbf{为当前用户删除包}: 从上述 \texttt{home.packages} 列表中移除对应的包名即可。
+    \item \textbf{应用更改}: 修改完 \texttt{home-manager.nix} 后，在仓库根目录运行 \texttt{make switch} 来应用更改。Home Manager 会自动安装或卸载指定的包。
+\end{itemize}
+\textbf{注意}: 对于需要在系统层面全局可用的包，应在对应的 \texttt{machines/<机器名>.nix} (或 \texttt{users/<用户>/nixos.nix}) 的 \texttt{environment.systemPackages} 中管理。
+
+\subsection{常见任务：修改用户环境}
+Home Manager 提供了丰富的选项来定制用户环境。
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Shell 配置}: 在 \texttt{home-manager.nix} 中查找类似 \texttt{programs.zsh = \{ enable = true; ... \};} 或 \texttt{programs.fish = \{ enable = true; ... \};} 的配置块，修改其中的选项来自定义你的 Shell (例如，启用插件、设置别名、修改提示符)。
+    \item \textbf{环境变量}: 使用 \texttt{home.sessionVariables = \{ VAR\_NAME = "value"; \};} 来设置用户会话的环境变量。
+    \item \textbf{Git 配置}: 通过 \texttt{programs.git = \{ enable = true; userName = "..."; userEmail = "..."; ... \};} 配置 Git。
+    \item \textbf{应用程序配置}: Home Manager 支持许多应用程序的声明式配置，例如 Neovim (\texttt{programs.neovim}), Tmux (\texttt{programs.tmux}) 等。查阅 Home Manager 文档以了解特定程序的支持情况。
+    \item \textbf{应用更改}: 同样，修改完后运行 \texttt{make switch} 应用。
+\end{itemize}
+
+\section{高级功能与定制}
+本节介绍一些更高级的配置定制方法。
+
+\subsection{常见任务：使用 Overlays 修改或添加包}
+当你需要修改 Nixpkgs 中的某个包（例如，应用一个未被上游接受的补丁）或者添加一个简单的自定义包时，可以使用 Overlays。
+\begin{enumerate}[label=\textbf{\arabic*.}, wide, labelwidth=!, labelindent=0pt]
+    \item \textbf{创建 Overlay 文件}: 在 \texttt{overlays/} 目录下创建一个 \texttt{.nix} 文件，例如 \texttt{my-patches.nix}。
+    \item \textbf{定义 Overlay 函数}: 该文件应返回一个函数，其参数通常为 \texttt{self} 和 \texttt{super}。\texttt{self} 代表最终的 Nixpkgs 包集（包含所有 Overlays），\texttt{super} 代表应用当前 Overlay 之前的包集。例如：
+        \begin{lstlisting}
+# overlays/my-patches.nix
+self: super: {
+  # 示例 1: 修改现有包 htop，比如应用一个本地补丁
+  htop = super.htop.overrideAttrs (oldAttrs: {
+    patches = (oldAttrs.patches or []) ++ [ ./my-htop.patch ];
+    # 你也可以修改 version, src, buildInputs, buildPhase 等
+  });
+
+  # 示例 2: 添加一个简单的包 (假设定义在同目录的 my-tool.nix)
+  # my-tool = super.callPackage ./my-tool.nix {};
+
+  # 示例 3: 添加一个引用自定义 pkgs/ 目录下包的别名
+  # my-complex-tool = self.callPackage ../pkgs/my-complex-tool {};
+}
+        \end{lstlisting}
+        确保你的补丁文件 (如 \texttt{my-htop.patch}) 也放在仓库中，路径相对于 Overlay 文件。
+    \item \textbf{应用 Overlay}: 通常，\texttt{lib/mksystem.nix} 会被设计为自动加载 \texttt{overlays/} 目录下的所有 \texttt{.nix} 文件，并将它们应用到传递给 Home Manager 和系统配置的 \texttt{pkgs} 实例上。如果不是自动加载，你可能需要在 \texttt{flake.nix} 中显式导入并传递它们。请检查你的 \texttt{lib/mksystem.nix} 实现。
+    \item \textbf{构建系统}: 运行 \texttt{make switch}。现在系统将使用你通过 Overlay 修改或添加的包。
+\end{enumerate}
+对于更复杂的自定义包，建议放在 \texttt{pkgs/} 目录下独立管理。
+
+\subsection{常见任务：添加新的系统配置}
+当你需要为一台新的物理机、虚拟机或特定用途（如一个新的 WSL 配置）添加配置时：
+\begin{enumerate}[label=\textbf{\arabic*.}, wide, labelwidth=!, labelindent=0pt]
+    \item \textbf{创建机器配置文件}: 在 \texttt{machines/} 目录下，为新系统创建一个 Nix 文件，例如 \texttt{machines/new-server.nix}。定义该机器特有的硬件设置、内核模块、文件系统配置或系统服务。可以参考现有的机器配置作为模板。
+    \item \textbf{在 \texttt{flake.nix} 中添加输出}: 编辑 \texttt{flake.nix} 文件，在 \texttt{outputs} 函数内部，模仿现有的 \texttt{nixosConfigurations} 或 \texttt{darwinConfigurations} 条目，添加一个新的条目。这通常涉及到调用 \texttt{lib/mksystem.nix} 函数，并传入新机器的名称和相关参数：
+        \begin{lstlisting}[escapeinside={(*@}{@*)}]
+outputs = { self, nixpkgs, home-manager, ... }@inputs: let
+  # 假设 mkSystem 在这里定义或导入
+  mkSystem = import ./lib/mksystem.nix { inherit inputs; };
+in {
+  # ... 其他输出 ...
+
+  nixosConfigurations."new-server" = mkSystem "new-server" {
+    system = "x86_64-linux"; # 或 aarch64-linux, aarch64-darwin 等
+    user = "admin-user";     # 指定默认或主要用户的配置
+    # extraModules = [ ... ]; # 可能需要传入额外的系统模块
+    # isWSL = true;         # 如果是为 WSL 设计的配置
+  };
+
+  # 如果是 macOS:
+  # darwinConfigurations."new-mac" = mkSystem "new-mac" { ... };
+};
+        \end{lstlisting}
+    \item \textbf{确保用户配置存在}: 确认你在上面 \texttt{mkSystem} 调用中指定的 \texttt{user} (例如 \texttt{admin-user}) 在 \texttt{users/} 目录下有相应的配置（至少需要 \texttt{nixos.nix} 或 \texttt{darwin.nix} 以及 \texttt{home-manager.nix} 文件）。
+    \item \textbf{在新机器上部署}: 将配置仓库克隆到新机器上，然后根据新机器的平台和配置名称 (\texttt{new-server} 或 \texttt{new-mac})，执行相应的首次部署步骤（参考第 3.3 节）或直接运行 \texttt{make switch}（如果 Nix 已安装且网络可达）。对于需要引导的情况，可能需要先设置 \texttt{export NIXNAME=new-server}。
+\end{enumerate}
+
+\section{日常维护与工作流}
+本节汇总了日常使用和维护此 Nix 配置时最常用的命令。
+
+\subsection{应用配置更改}
+当你修改了任何 \texttt{.nix} 配置文件（无论是系统级、用户级、模块、Overlay 还是包定义）后，需要运行以下命令来构建并应用这些更改：
+\begin{lstlisting}
+# 在配置仓库的根目录下
+# 对于非默认主机/用户配置，可能需要先设置 NIXNAME
+# export NIXNAME=my-other-machine
+make switch
+\end{lstlisting}
+这个命令会根据当前环境（NixOS 或 Darwin）调用相应的 \texttt{nixos-rebuild switch} 或 \texttt{darwin-rebuild switch}，并自动传入 Flake 路径和配置名称。
+
+\subsection{测试配置更改}
+在正式应用更改之前，特别是对于复杂的修改，建议先测试构建是否成功：
+\begin{lstlisting}
+# 在配置仓库的根目录下
+# 对于非默认主机/用户配置，可能需要先设置 NIXNAME
+# export NIXNAME=...
+make test
+\end{lstlisting}
+这通常会调用 \texttt{nixos-rebuild build} 或 \texttt{darwin-rebuild build} (或 \texttt{nix build})，只构建配置而不激活它。如果构建失败，会报告错误，避免破坏当前系统。
+
+\subsection{更新 Flake 依赖}
+要将 \texttt{flake.nix} 中定义的外部依赖（如 \texttt{nixpkgs}, \texttt{home-manager} 等）更新到其 Flake URL 指向的最新版本，运行：
+\begin{lstlisting}
+nix flake update
+\end{lstlisting}
+这会修改 \texttt{flake.lock} 文件以反映新的依赖版本。更新 lock 文件后，你需要运行 \texttt{make switch} 来下载、构建并应用这些更新后的依赖及其带来的变化。
+
+\subsection{编译本文档}
+如果你修改了本文档（\texttt{doc/configuration\_guide.tex}），并且你的环境中安装了必要的 LaTeX 工具链（特别是 XeLaTeX），可以运行：
+\begin{lstlisting}
+make doc
+\end{lstlisting}
+这通常会调用 \texttt{xelatex} 命令在 \texttt{doc/} 目录下生成 PDF 文件 (\texttt{configuration\_guide.pdf})。
+
+\textbf{安装 LaTeX}: 如果缺少 LaTeX，可以通过将 \texttt{pkgs.texlive.combined.scheme-full} (或更小的 scheme) 添加到你的 \texttt{home.packages} (或系统包) 并运行 \texttt{make switch} 来安装。
+
+\section{结论}
+该 Nix 配置仓库通过精心设计的模块化结构和对 Nix Flakes 的运用，提供了一个强大、灵活且可复现的跨平台系统与用户环境管理解决方案。
+    \begin{itemize}
+        \item 其清晰的关注点分离和代码复用实践，显著提高了复杂配置的可维护性和可扩展性。
+        \item Flakes 带来的显式依赖管理和构建确定性，确保了环境的一致性和可靠性。
+        \item 通过整合 Home Manager、Overlays 等工具，实现了从底层系统到用户应用程序的全面声明式管理。
+        \item 提供的 \texttt{Makefile} 和详细的部署指南简化了上手和日常操作流程。
+    \end{itemize}
+对于追求高效、稳定和一致性配置管理的个人开发者或团队而言，这套配置及其背后的设计原则提供了一个优秀的实践范例和坚实基础。
+
+% --- 结束文档 ---
+\end{document}

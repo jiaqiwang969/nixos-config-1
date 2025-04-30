@@ -94,26 +94,40 @@
     ];
   };
 
-  # List packages installed in system profile. To search, run:
-  # $ nix search wget
+  # ① 启用 OpenGL（解决 “Unable to get EGL Display” 前提）
+  hardware.opengl.enable = true;
+  #hardware.opengl.driSupport = true;
+  #hardware.opengl.driSupport32Bit = true;
+
+  # ② 强制 Xorg 使用 vmware 驱动
+  #services.xserver.videoDrivers = [ "vmware" ];
+
+  # ③ 如果你在 GNOME + GDM 下，为了排除 Wayland 干扰，可以先禁用 Wayland
+  #    （若你并不想禁用 Wayland，可删除此行）
+  #services.xserver.displayManager.gdm.wayland = false;
+
+  # ④ 在已有的 environment.systemPackages 里，加一个 nixGL
+  #    你已经有 mesa / libGL / egl-wayland，这里再加上：
   environment.systemPackages = with pkgs; [
     cachix
     gnumake
     killall
     niv
     xclip
+    mesa
+    libGL
+    egl-wayland
 
     # For hypervisors that support auto-resizing, this script forces it.
-    # I've noticed not everyone listens to the udev events so this is a hack.
     (writeShellScriptBin "xrandr-auto" ''
       xrandr --output Virtual-1 --auto
     '')
   ] ++ lib.optionals (currentSystemName == "vm-aarch64") [
-    # This is needed for the vmware user tools clipboard to work.
-    # You can test if you don't need this by deleting this and seeing
-    # if the clipboard sill works.
     gtkmm3
   ];
+
+
+
 
   # Our default non-specialised desktop environment.
   services.xserver = lib.mkIf (config.specialisation != {}) {
@@ -130,6 +144,8 @@
   #   enable = true;
   #   enableSSHSupport = true;
   # };
+
+  programs.nix-ld.enable = true;
 
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;

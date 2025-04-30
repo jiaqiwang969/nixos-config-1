@@ -55,39 +55,56 @@ in {
   # Packages I always want installed. Most packages I install using
   # per-project flakes sourced with direnv and nix-shell, so this is
   # not a huge list.
-  home.packages = [
-    pkgs._1password-cli
-    pkgs.asciinema
-    pkgs.bat
-    pkgs.eza
-    pkgs.fd
-    pkgs.fzf
-    pkgs.gh
-    pkgs.htop
-    pkgs.jq
-    pkgs.ripgrep
-    pkgs.sentry-cli
-    pkgs.tree
-    pkgs.watch
+  home.packages = with pkgs; [
+    _1password-cli
+    asciinema
+    bat
+    eza
+    fd
+    freecad
+    fzf
+    gh
+    htop
+    jq
+    ripgrep
+    sentry-cli
+    tree
+    watch
 
-    pkgs.gopls
-    pkgs.zigpkgs."0.13.0"
+    gopls
+    zigpkgs."0.13.0"
 
     # Node is required for Copilot.vim
-    pkgs.nodejs
-    pkgs.ghostty
-    #pkgs.code-cursor
+    nodejs
+    ghostty
+    graphviz
+
+    # 添加 texlive 完整版
+    texlive.combined.scheme-full
+
+    # Python 环境和工具
+    (python311.withPackages (ps: with ps; [
+      matplotlib
+      numpy
+      scipy
+      trimesh
+      rtree
+      pip
+    ]))
+    uv                           # 用于 mcp
+
+    #code-cursor
   ] ++ (lib.optionals isDarwin [
     # This is automatically setup on Linux
-    pkgs.cachix
-    pkgs.tailscale
+    cachix
+    tailscale
   ]) ++ (lib.optionals (isLinux && !isWSL) [
-    pkgs.chromium
-    pkgs.firefox
-    pkgs.rofi
-    pkgs.valgrind
-    pkgs.zathura
-    pkgs.xfce.xfce4-terminal
+    chromium
+    firefox
+    rofi
+    valgrind
+    zathura
+    xfce.xfce4-terminal
   ]);
 
   #---------------------------------------------------------------------
