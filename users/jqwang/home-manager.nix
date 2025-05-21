@@ -81,16 +81,6 @@ in {
 
     # 添加 texlive 完整版
     texlive.combined.scheme-full
-
-    # Python 环境和工具
-    (python311.withPackages (ps: with ps; [
-      matplotlib
-      numpy
-      scipy
-      trimesh
-      rtree
-      pip
-    ]))
     uv                           # 用于 mcp
 
     #code-cursor

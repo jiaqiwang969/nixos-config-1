@@ -37,13 +37,16 @@ in systemFunc rec {
     # Allow unfree packages.
     { nixpkgs.config.allowUnfree = true; }
 
+    # Import machineConfig earlier, so its settings (like boot.isContainer)
+    # are available when the wsl module is evaluated.
+    machineConfig
+
     # Bring in WSL if this is a WSL build
     (if isWSL then inputs.nixos-wsl.nixosModules.wsl else {})
 
     # Snapd on Linux
     (if isLinux then inputs.nix-snapd.nixosModules.default else {})
 
-    machineConfig
     userOSConfig
     home-manager.home-manager {
       home-manager.useGlobalPkgs = true;

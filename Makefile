@@ -1,6 +1,6 @@
 # Connectivity info for Linux VM
-NIXADDR ?= 172.16.148.144
-NIXPORT ?= 22
+NIXADDR ?= 192.168.0.215
+NIXPORT ?= 2202
 NIXUSER ?= jqwang
 NIXDEVICE ?= /dev/sda
 
@@ -8,7 +8,7 @@ NIXDEVICE ?= /dev/sda
 MAKEFILE_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
 # The name of the nixosConfiguration in the flake
-NIXNAME ?= vm-aarch64
+NIXNAME ?= vm-intel
 
 # SSH options that are used. These aren't meant to be overridden but are
 # reused a lot so we just store them up here.
@@ -63,6 +63,8 @@ vm/bootstrap0:
 		mount /dev/disk/by-label/nixos /mnt; \
 		mkdir -p /mnt/boot; \
 		mount /dev/disk/by-label/boot /mnt/boot; \
+		rm -f /mnt/etc/nixos/configuration.nix; \
+		rm -f /mnt/etc/nixos/hardware-configuration.nix; \
 		nixos-generate-config --root /mnt; \
 		sed --in-place '/system\.stateVersion = .*/a \
 			nix.package = pkgs.nixVersions.latest;\n \
@@ -120,4 +122,4 @@ vm/switch:
 # Build a WSL installer
 .PHONY: wsl
 wsl:
-	 nix build ".#nixosConfigurations.wsl.config.system.build.installer"
+	nix build ".#nixosConfigurations.wsl.config.system.build.tarballBuilder"

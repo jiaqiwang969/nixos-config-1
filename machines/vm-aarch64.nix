@@ -4,8 +4,8 @@
     ../modules/vmware-guest.nix
     ./vm-shared.nix
     (import (fetchTarball {
-        url = "https://github.com/nix-community/nixos-vscode-server/tarball/master";
-        sha256 = "09j4kvsxw1d5dvnhbsgih0icbrxqv90nzf0b589rb5z6gnzwjnqf"; # ✅ 正确
+        url = "https://github.com/warmingking/nixos-cursor-server/tarball/master";
+        sha256 = "0iqrhkysfjmqpkxj31vk1y7iq8541sfnpqjlg1jlgvn20kbpym3p"; # ✅ 正确
     }))
   ];
 
@@ -57,7 +57,8 @@
       ];
   };
 
-  services.vscode-server.enable = true;
-  services.vscode-server.enableFHS = true;
-  services.vscode-server.installPath = "$HOME/.cursor-server";  # 👈 关键是这行
+  services.cursor-server.enable = true;
+  #services.vscode-server.enable = true;
+  #services.vscode-server.enableFHS = true;
+  #services.vscode-server.installPath = "$HOME/.cursor-server";  # 👈 关键是这行
 }
